@@ -41,6 +41,41 @@ class CdkHarnessDelegateStack(core.Stack):
             )]
         )
 
+        ecs_exec_role = iam.Role(self, "harnessECSExecutionRole", assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"))
+        # cluster_role = iam.Role.from_role_arn(
+        #     self, 
+        #     'Role', 
+        #     'arn:aws:iam::626449308506:role/ecsInstanceRole'
+        # )
+
+        ecs_exec_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AmazonEC2ContainerServiceRole'))
+        ecs_exec_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AmazonECSTaskExecutionRolePolicy'))
+        ecs_exec_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AmazonEC2ContainerServiceforEC2Role'))
+        ecs_exec_role.add_to_policy(iam.PolicyStatement(
+            effect = iam.Effect.ALLOW,
+            actions = [
+                "ecr:DescribeRepositories",
+                "ecs:ListClusters",
+                "ecs:ListServices",
+                "ecs:DescribeServices",
+                "ecr:ListImages",
+                "ecs:RegisterTaskDefinition",
+                "ecs:CreateService",
+                "ecs:ListTasks",
+                "ecs:DescribeTasks",
+                "ecs:CreateService",
+                "ecs:DeleteService",
+                "ecs:UpdateService",
+                "ecs:DescribeContainerInstances",
+                "ecs:DescribeTaskDefinition",
+                "application-autoscaling:DescribeScalableTargets",
+                "iam:ListRoles",
+                "iam:PassRole"
+                ],
+            resources = ["*"],
+        ))
+
+
         ## Create the ECS Cluster
         cluster = ecs.Cluster(
             self, "harnessCluster",
@@ -48,48 +83,27 @@ class CdkHarnessDelegateStack(core.Stack):
         )
 
         # ## Create a ECS Task role
-        ecs_task_role = iam.Role(self, "harnessECSRole", assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"))
+        # ecs_task_role = iam.Role(self, "harnessECSTaskRole", assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"))
 
-        ecs_task_role.add_to_policy(iam.PolicyStatement(
-        effect = iam.Effect.ALLOW,
-        actions = [
-            "ecr:GetAuthorizationToken",
-            "ecr:BatchCheckLayerAvailability",
-            "ecr:GetDownloadUrlForLayer",
-            "ecr:BatchGetImage",
-            "logs:CreateLogStream",
-            "logs:PutLogEvents"
-            ],
-        resources = ["*"],
-        ))
-
-        # Use the ApplicationLoadBalancedFargateService construct to pull the local Dockerfile,
-        # push the image to ECR, and deploy to Fargate.
-        # app = ecs_patterns.ApplicationLoadBalancedFargateService(
-        #     self, 'harnessDelegate',
-        #     cluster = cluster,
-        #     assign_public_ip = False,
-        #     cpu = 1024,
-        #     memory_limit_mib = 6144,
-        #     desired_count = 1,
-        #     public_load_balancer = False,
-        #     task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
-        #         image = ecs.ContainerImage.from_registry('harness/delegate:latest'),
-        #         enable_logging = False,
-        #         container_port = 8080,
-        #         task_role = ecs_task_role,
-        #         environment = getHarnessEnv()
-        #     )
-        # )
-
-        # # Add a custom health check to the target group in the ApplicationLoadBalancedFargateService construct.
-        # app.target_group.configure_health_check(port='8080', healthy_http_codes='200')
+        # ecs_task_role.add_to_policy(iam.PolicyStatement(
+        # effect = iam.Effect.ALLOW,
+        # actions = [
+        #     "ecr:GetAuthorizationToken",
+        #     "ecr:BatchCheckLayerAvailability",
+        #     "ecr:GetDownloadUrlForLayer",
+        #     "ecr:BatchGetImage",
+        #     "logs:CreateLogStream",
+        #     "logs:PutLogEvents"
+        #     ],
+        # resources = ["*"],
+        # ))
 
         task_definition = ecs.TaskDefinition(
             self, 
             'harnessFargateTask',
             compatibility = ecs.Compatibility('FARGATE'),
-            task_role = ecs_task_role, 
+            execution_role = ecs_exec_role,
+            task_role = ecs_exec_role,
             memory_mib = '6144', 
             cpu = '1024'
         )
